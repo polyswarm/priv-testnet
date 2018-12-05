@@ -1,4 +1,4 @@
-FROM ethereum/client-go
+FROM ethereum/client-go:v1.8.18
 LABEL maintainer="PolySwarm Developers <info@polyswarm.io>"
 
 WORKDIR /root/.ethereum
