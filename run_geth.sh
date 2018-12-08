@@ -1,7 +1,6 @@
 #!/bin/sh
 
 set -e -x
-# beyond dumb that we can't use an ip
 
 cp genesis_$CHAIN_NAME.json genesis.json
 
@@ -13,4 +12,5 @@ if [ $nid -ne $NETWORK_ID ]; then
     geth init genesis.json
 fi
 
-geth --networkid $NETWORK_ID "$@"
+geth version
+geth --nodiscover --maxpeers 0 --syncmode full --mine --networkid $NETWORK_ID "$@"
