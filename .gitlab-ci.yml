@@ -1,5 +1,9 @@
 image: docker:stable
 
+stages:
+  - e2e
+  - deploy
+
 services:
   - docker:dind
 
@@ -9,7 +13,7 @@ before_script:
 kick-e2e:
     tags:
         - docker
-    stage: deploy
+    stage: e2e
     script:
       - set -e
 
@@ -41,3 +45,14 @@ kick-e2e:
           echo "failure further down the pipeline"
           exit 1
         fi
+
+builddock:
+  stage: deploy
+  only:
+    - master
+    - feature/docker-build
+  script:
+    - docker build -t polyswarm/priv-testnet:latest -t polyswarm/priv-testnet:$CI_COMMIT_SHA --label git_commit_id=$CI_COMMIT_SHA -f docker/Dockerfile .
+    - docker login -u $CI_CUSTOM_DOCKER_HUB_USERNAME -p $CI_CUSTOM_DOCKER_HUB_PASSWORD
+    - docker push polyswarm/priv-testnet:latest
+    - docker push polyswarm/priv-testnet:$CI_COMMIT_SHA
