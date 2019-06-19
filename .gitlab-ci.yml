@@ -1,18 +1,43 @@
-image: docker:stable
-
-stages:
-  - e2e
-  - deploy
+image: $REPO_URL/stage
 
 services:
   - docker:dind
 
-before_script:
-  - apk --no-cache add curl jq
+stages:
+  - build
+  - test
+  - e2e
+  - release
+  - deployment
 
-kick-e2e:
+variables:
+  DOCKER_HOST: tcp://localhost:2375/
+  BASE_IMAGE_NAME: priv-testnet
+
+###############################################################
+# Build Stage (jobs inside a stage run in parallel)
+###############################################################
+
+build:
+  stage: build
+  tags:
+    - kube
+  script:
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:latest || true
+    - docker build -t $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA -f docker/Dockerfile --cache-from=$REPO_URL/$BASE_IMAGE_NAME:latest .
+    - docker push $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
+
+###############################################################
+# Test Stage
+###############################################################
+
+###############################################################
+# Test e2e
+###############################################################
+
+test-e2e:
     tags:
-        - docker
+      - kube
     stage: e2e
     script:
       - set -e
@@ -46,13 +71,29 @@ kick-e2e:
           exit 1
         fi
 
-builddock:
-  stage: deploy
+###############################################################
+# Release Stage
+###############################################################
+
+release-latest:
+  stage: release
+  tags:
+    - kube
   only:
     - master
-    - feature/docker-build
   script:
-    - docker build -t polyswarm/priv-testnet:latest -t polyswarm/priv-testnet:$CI_COMMIT_SHA --label git_commit_id=$CI_COMMIT_SHA -f docker/Dockerfile .
+    # Gets the current image that was built in the CI for this commit
+    - docker pull $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA
+    # Creates new tags for this image, one that should go to AWS and another to DockerHub with the tag "latest"
+    - docker tag $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA $REPO_URL/$BASE_IMAGE_NAME:latest
+    - docker tag $REPO_URL/$BASE_IMAGE_NAME:$CI_COMMIT_SHA polyswarm/$BASE_IMAGE_NAME:latest
+    # Pushes to AWS
+    - docker push $REPO_URL/$BASE_IMAGE_NAME:latest
+    # Pushes to DockerHub
+    - docker logout
     - docker login -u $CI_CUSTOM_DOCKER_HUB_USERNAME -p $CI_CUSTOM_DOCKER_HUB_PASSWORD
-    - docker push polyswarm/priv-testnet:latest
-    - docker push polyswarm/priv-testnet:$CI_COMMIT_SHA
+    - docker push polyswarm/$BASE_IMAGE_NAME:latest
+
+###############################################################
+# Deployment Stage
+###############################################################

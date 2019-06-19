@@ -13,4 +13,5 @@ if [ $nid -ne $NETWORK_ID ]; then
 fi
 
 geth version
-geth --nodiscover --maxpeers 0 --syncmode full --mine --networkid $NETWORK_ID "$@"
+# hand over execution to geth
+exec geth --nodiscover --maxpeers 0 --syncmode full --mine --networkid $NETWORK_ID "$@"
